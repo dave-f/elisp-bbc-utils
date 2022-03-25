@@ -50,3 +50,5 @@
 (defun encode-pixel (left right)
   "Given two pixel colours, returns the corresponding Mode 2 byte"
   (logior (lsh (nth left pixelValues) 1) (nth right pixelValues)))
+
+(provide 'bbc-utils)
