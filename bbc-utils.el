@@ -24,10 +24,6 @@
         (setq res "0"))
     res))
 
-(defun split-number(arg)
-  "split a 4 bit number to its 2 values"
-  (concat (number-to-string (lsh arg -2)) "," (number-to-string (logand arg 3))))
-
 (defun create-basic-nula-palette(filename)
   "create a buffer containing codes to set up the NuLA palette from basic"
   (interactive "fPalette file:")
@@ -37,6 +33,19 @@
     (message "length %d" (length file-bytes))
     (cl-loop for i from 0 to (1- (length file-bytes)) by 2 do
              (insert (format "?&FE23=&%02X : ?&FE23=&%02X\n" (nth i file-bytes) (nth (1+ i) file-bytes))))))
+
+(defun set-nula-colour-in-file (filename colour-index red green blue)
+  "Convert an RGB (0..255) colour to NuLA format and write at `colour-index' in `filename'"
+  (let* ((file-bytes (string-to-list (f-read-bytes filename)))
+         (file-offset (* colour-index 2))
+         (new-red (round (* (/ red 255.0) 16.0)))
+         (new-green (round (* (/ green 255.0) 16.0)))
+         (new-blue (round (* (/ blue 255.0) 16.0)))
+         (byte-one (logior (lsh colour-index 4) new-red))
+         (byte-two (logior (lsh new-green 4) new-blue)))
+    (setq file-bytes (-replace-at file-offset byte-one file-bytes))
+    (setq file-bytes (-replace-at (1+ file-offset) byte-two file-bytes))
+    (f-write-bytes (apply 'unibyte-string file-bytes) (concat filename ".new"))))
 
 (defun decode-pixel (arg)
   "Given a number, returns the corresponding pixels for a Mode 2 byte"
