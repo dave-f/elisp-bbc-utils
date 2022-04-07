@@ -14,6 +14,9 @@
 (defconst pixelLeft  '#b10101010)
 (defconst pixelRight '#b01010101)
 
+(defun lerp (v0 v1 T)
+  (+ (* (- 1 T) v0) (* T v1)))
+
 (defun to-binary-string (i)
   "convert an integer into it's binary representation in string format"
   (let ((res ""))
@@ -24,17 +27,47 @@
         (setq res "0"))
     res))
 
-(defun create-basic-nula-palette(arg filename)
+(defun create-basic-nula-palette-from-file(arg filename)
   "Create a buffer containing codes to set up the NuLA palette from BASIC.  With prefix arg output as assembler EQUBs"
   (interactive "P\nfPalette file: ")
   (switch-to-buffer (get-buffer-create "*palette*"))
+  (message (number-to-string (prefix-numeric-value arg)))
   (erase-buffer)
   (let* ((file-bytes (string-to-list (f-read-bytes filename))))
     (message "length %d" (length file-bytes))
     (cl-loop for i from 0 to (1- (length file-bytes)) by 2 do
-             (if (consp arg)
+             (if (= (prefix-numeric-value arg) 4)
                  (insert (format "EQUB &%02X : EQUB &%02X\n" (nth i file-bytes) (nth (1+ i) file-bytes)))
                (insert (format "?&FE23=&%02X : ?&FE23=&%02X\n" (nth i file-bytes) (nth (1+ i) file-bytes)))))))
+
+(defun create-data-rgb-from-nula-palette-file(filename)
+  "Create a buffer containing DATA statements with R,G,B components from the NuLA palette file."
+  (interactive "fPalette file: ")
+  (switch-to-buffer (get-buffer-create "*palette*"))
+  (erase-buffer)
+  (let* ((file-bytes (string-to-list (f-read-bytes filename))))
+    (cl-loop for c from 0 to 9 do ; TODO: make this configurable
+             (insert "REM " (number-to-string c) "\n")
+             (cl-loop for i from 0 to (1- (length file-bytes)) by 2 do
+                      (let* ((byte-one (nth i file-bytes)) (byte-two (nth (1+ i) file-bytes))
+                             (red (logand byte-one 15)) (green (logand (lsh byte-two -4) 15)) (blue (logand byte-two 15))
+                             (new-red (truncate (lerp 0 red (/ c 9.0)))) (new-green (truncate (lerp 0 green (/ c 9.0)))) (new-blue (truncate (lerp 0 blue (/ c 9.0)))))
+                        (insert "DATA " (number-to-string new-red) "," (number-to-string new-green) "," (number-to-string new-blue) "\n"))))))
+
+(defun create-basic-nula-palette(arg red green blue)
+  "Create a buffer containing codes to set up the NuLA palette from BASIC.  With prefix arg output as assembler EQUBs"
+  (interactive "P\nnRed: \nnGreen: \nnBlue: ")
+  (switch-to-buffer (get-buffer-create "*palette*"))
+  (erase-buffer)
+  (cl-loop for i from 0 to 15 do
+           (let* ((new-red (round (* (/ red 255.0) 16.0)))
+                  (new-green (round (* (/ green 255.0) 16.0)))
+                  (new-blue (round (* (/ blue 255.0) 16.0)))
+                  (byte-one (logior (lsh i 4) new-red))
+                  (byte-two (logior (lsh new-green 4) new-blue)))
+             (if (consp arg)
+                 (insert (format "EQUB &%02X : EQUB &%02X\n" byte-one byte-two))
+               (insert (format "?&FE23=&%02X : ?&FE23=&%02X\n" byte-one byte-two))))))
 
 (defun set-nula-colour-in-file (filename colour-index red green blue)
   "Convert an RGB (0..255) colour to NuLA format and write at `colour-index' in `filename'"
