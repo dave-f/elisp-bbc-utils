@@ -1,4 +1,5 @@
-;;
+;; -*- lexical-binding: t -*-
+
 ;; BBC Utils
 ;; A collection of Emacs Lisp utility functions
 
