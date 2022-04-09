@@ -40,19 +40,27 @@
                  (insert (format "EQUB &%02X : EQUB &%02X\n" (nth i file-bytes) (nth (1+ i) file-bytes)))
                (insert (format "?&FE23=&%02X : ?&FE23=&%02X\n" (nth i file-bytes) (nth (1+ i) file-bytes)))))))
 
-(defun create-data-rgb-from-nula-palette-file(filename)
-  "Create a buffer containing DATA statements with R,G,B components from the NuLA palette file."
-  (interactive "fPalette file: ")
+(defun create-data-rgb-from-nula-palette-file(filename steps)
+  "Create a buffer containing DATA statements with R,G,B components from the NuLA palette file, lerped from 0,0,0 to R,G,B over a number of steps"
+  (interactive "fPalette file: \nnSteps: ")
   (switch-to-buffer (get-buffer-create "*palette*"))
   (erase-buffer)
+  (let (lo hi)
+    (if (<= steps 1)
+        (progn
+          (setq lo 1)
+          (setq hi 1))
+      (progn
+        (setq lo 0)
+        (setq hi (1- steps))))
   (let* ((file-bytes (string-to-list (f-read-bytes filename))))
-    (cl-loop for c from 0 to 9 do ; TODO: make this configurable
+    (cl-loop for c from lo to hi do
              (insert "REM " (number-to-string c) "\n")
              (cl-loop for i from 0 to (1- (length file-bytes)) by 2 do
                       (let* ((byte-one (nth i file-bytes)) (byte-two (nth (1+ i) file-bytes))
                              (red (logand byte-one 15)) (green (logand (lsh byte-two -4) 15)) (blue (logand byte-two 15))
-                             (new-red (truncate (lerp 0 red (/ c 9.0)))) (new-green (truncate (lerp 0 green (/ c 9.0)))) (new-blue (truncate (lerp 0 blue (/ c 9.0)))))
-                        (insert "DATA " (number-to-string new-red) "," (number-to-string new-green) "," (number-to-string new-blue) "\n"))))))
+                             (new-red (truncate (lerp 0 red (/ c (float hi))))) (new-green (truncate (lerp 0 green (/ c (float hi))))) (new-blue (truncate (lerp 0 blue (/ c (float hi))))))
+                        (insert "DATA " (number-to-string new-red) "," (number-to-string new-green) "," (number-to-string new-blue) "\n")))))))
 
 (defun create-basic-nula-palette(arg red green blue)
   "Create a buffer containing codes to set up the NuLA palette from BASIC.  With prefix arg output as assembler EQUBs"
